@@ -1396,6 +1396,11 @@ func (r *Renderer) render(s *scene.Scene) error {
 	if scale <= 0 {
 		scale = 1
 	}
+	if s.Zoom > 0 {
+		// The layer's scale is the screen's: zoomed content draws more
+		// pixels a DIP, not more a point.
+		scale /= float64(s.Zoom)
+	}
 	r.cur = &r.formats[0]
 	if r.wide {
 		r.cur = &r.formats[1]

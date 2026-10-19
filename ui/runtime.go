@@ -112,6 +112,11 @@ type engine struct {
 	painter         Painter
 	glyphRun        glyphRun
 
+	// zoom is the content's zoom (Context.SetZoom), 0 for none;
+	// zoomChanged tells that it changed since the frame's size was read.
+	zoom        float32
+	zoomChanged bool
+
 	// building counts the public constructors under way: input queued
 	// while more were under way than now belongs to controls built since,
 	// which applyInputs finalizes (see value_input.go).
@@ -441,11 +446,12 @@ func (rt *engine) runFrame() {
 	rt.focusRead = false
 	rt.stats.begin(rt)
 	now := rt.now()
-	w, h, scale := rt.host.size()
+	rt.zoomChanged = false
+	w, h, scale := rt.size()
 	// The content takes the room the inspector leaves.
 	appW := rt.insp.contentWidth(w)
 	rt.insp.lap(-1)
-	rt.c.titleBar = rt.host.titleBar()
+	rt.c.titleBar = rt.titleBar()
 	rt.c.vibrancy = rt.host.vibrancy()
 	rt.text.BeginFrame()
 	rt.gen = rt.text.Generation()
@@ -472,6 +478,15 @@ func (rt *engine) runFrame() {
 	for pass := 0; pass < 3; pass++ {
 		rt.pass = pass
 		rt.consumed = false
+		if rt.zoomChanged {
+			// The view zoomed the content: this pass builds it at its new
+			// size.
+			rt.zoomChanged = false
+			w, h, scale = rt.size()
+			appW = rt.insp.contentWidth(w)
+			rt.c.titleBar = rt.titleBar()
+			rt.painted = [3]float32{w, h, scale}
+		}
 		rt.nextRegs = rt.nextRegs[:0]
 		clear(rt.kept)
 		rt.c.reset(now, appW, h)
@@ -501,9 +516,19 @@ func (rt *engine) runFrame() {
 		if rt.closing {
 			return // an action closed it
 		}
-		if !rt.consumed {
+		if !rt.consumed && !rt.zoomChanged {
 			break
 		}
+	}
+	if rt.zoomChanged {
+		// Zoomed in the last pass: laid out at the new size, and built
+		// at it in the next frame.
+		rt.zoomChanged = false
+		w, h, scale = rt.size()
+		appW = rt.insp.contentWidth(w)
+		rt.c.titleBar = rt.titleBar()
+		rt.painted = [3]float32{w, h, scale}
+		rt.host.requestFrame()
 	}
 	if rt.stats != nil {
 		rt.stats.passes = rt.pass + 1
@@ -544,7 +569,7 @@ func (rt *engine) runFrame() {
 	rt.updateTextInput()
 	rt.updateCursor()
 	if rt.access {
-		rt.host.updateAccessibility(rt.accessTree())
+		rt.host.updateAccessibility(rt.windowAccess(rt.accessTree()))
 	}
 	if h, ok := rt.host.(*headless); ok {
 		// For tests, whether assistive technology reads the window or not.
@@ -611,7 +636,7 @@ func (rt *engine) repaintNow() {
 // elements painted again when only drawings moved since, else a frame
 // built anew.
 func (rt *engine) surfaceFrame() {
-	if w, h, scale := rt.host.size(); rt.redraw && !rt.inFrame && rt.c.root != nil &&
+	if w, h, scale := rt.size(); rt.redraw && !rt.inFrame && rt.c.root != nil &&
 		rt.painted == [3]float32{w, h, scale} && rt.text.Generation() == rt.gen {
 		rt.repaintFrame(w, h, scale)
 		return
