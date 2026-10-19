@@ -1377,7 +1377,8 @@ func (e *node) DrawOver(fn func(p *Painter, r Rect)) *node { e.paintAfterFn = fn
 func (e *node) ID() uint64 { return e.id }
 
 // Bounds returns the previous frame's transformed bounding rectangle in
-// window DIPs; it is empty for an element the previous frame lacked.
+// window DIPs, the content's when zoomed (Context.SetZoom); it is empty
+// for an element the previous frame lacked.
 // LayoutBounds returns its box before visual transforms.
 func (e *node) Bounds() Rect {
 	if !e.hasState() {
