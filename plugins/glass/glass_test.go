@@ -87,3 +87,50 @@ func TestString(t *testing.T) {
 		t.Errorf("String: %q", s)
 	}
 }
+
+// Panes up to 100 DIPs, as controls, keep the measured material; those
+// from 200, as sidebars, are clearer; between, it eases from one to the
+// other.
+func TestPaneMaterial(t *testing.T) {
+	near := func(a, b float32) bool { return a-b < 1e-5 && b-a < 1e-5 }
+	for _, m := range []float32{20, 44, 72, 100} {
+		for _, s := range []float32{1, 2} {
+			bezel := min(36, m/2)
+			blur := min(max(m*0.035, 1), 10) * s
+			light := paneMaterial(m, s, false, false)
+			if light.blur != blur || light.bezel != bezel*s || light.refraction != 1.6*bezel*s || light.rim != 0.35 ||
+				light.low != 0.541 || light.high != 1 {
+				t.Errorf("light %v DIPs at %vx: %+v", m, s, light)
+			}
+			dark := paneMaterial(m, s, false, true)
+			if dark.blur != blur || dark.rim != 0.35 || dark.low != 0.15 || dark.high != 0.51 {
+				t.Errorf("dark %v DIPs at %vx: %+v", m, s, dark)
+			}
+		}
+	}
+	for _, m := range []float32{200, 300, 900} {
+		light, dark := paneMaterial(m, 2, false, false), paneMaterial(m, 2, false, true)
+		if !near(light.blur, 10) || !near(light.bezel, 96) || !near(light.rim, 0.5) || !near(light.low, 0.35) || light.high != 1 {
+			t.Errorf("light %v DIPs: %+v", m, light)
+		}
+		if !near(dark.blur, 10) || !near(dark.high, 0.6) || dark.low != 0.15 || !near(dark.rim, 0.5) {
+			t.Errorf("dark %v DIPs: %+v", m, dark)
+		}
+	}
+	// Between, every parameter lies between the two and moves one way.
+	prev := paneMaterial(100, 1, false, false)
+	for m := float32(110); m <= 200; m += 10 {
+		mat := paneMaterial(m, 1, false, false)
+		if mat.low > prev.low || mat.rim < prev.rim || mat.bezel < prev.bezel || mat.low < 0.35 || mat.rim > 0.5 {
+			t.Errorf("%v DIPs: %+v after %+v", m, mat, prev)
+		}
+		prev = mat
+	}
+	if mid := paneMaterial(150, 1, false, false); !near(mid.low, (0.541+0.35)/2) || !near(mid.rim, 0.425) {
+		t.Errorf("150 DIPs, half way: %+v", mid)
+	}
+	// Clear glass's tone is the same at any size.
+	if small, large := paneMaterial(60, 1, true, false), paneMaterial(400, 1, true, false); small.low != large.low || small.high != large.high || small.blur != large.blur {
+		t.Errorf("clear: %+v and %+v", small, large)
+	}
+}
