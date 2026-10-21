@@ -124,36 +124,50 @@ func Paint(p *ui.Painter, r ui.Rect, radius float32, g Glass) {
 // pane, at most half of it, and bends what shows through by up to 1.6
 // times that, mirroring what is inside it, as AppKit's do; light comes
 // from above and below, along a rim a pixel wide, and the pane casts no
-// shadow, as NSGlassEffectView's and the glass bezel's do not.
+// shadow, as NSGlassEffectView's and the glass bezel's do not. Panes
+// large as sidebars and inspectors are clearer (paneMaterial).
 func paint(p *ui.Painter, box ui.Rect, radii [4]float32, g Glass) {
 	if box.W <= 0 || box.H <= 0 {
 		return
 	}
-	s := p.Scale()
-	m := min(box.W, box.H)
-	bezel := min(36, m/2)
-	mat := material{
-		bezel:      bezel * s,
-		refraction: 1.6 * bezel * s,
-		rim:        0.35,
-		rimWidth:   1,
-		light:      math.Pi / 2,
-	}
-	switch {
-	case g.Style == Clear:
-		mat.blur = s
-		mat.low, mat.high, mat.curve, mat.saturation = 0.125, 1.082, 1, 1
-	case p.Theme().Dark:
-		mat.blur = min(max(m*0.035, 1), 10) * s
-		mat.low, mat.high, mat.curve, mat.saturation = 0.15, 0.51, 2, 2.2
-	default:
-		mat.blur = min(max(m*0.035, 1), 10) * s
-		mat.low, mat.high, mat.curve, mat.saturation = 0.541, 1, 1.2, 1
-	}
+	mat := paneMaterial(min(box.W, box.H), p.Scale(), g.Style == Clear, p.Theme().Dark)
 	if g.Tint.A > 0 {
 		mat.tint, mat.wideTint = p.EffectColor(g.Tint)
 		mat.tint[3] *= 0.88
 		mat.wideTint[3] *= 0.88
 	}
 	p.Effect(Effect, box, radii, mat.blur, mat.params())
+}
+
+// paneMaterial is the material of a pane whose shorter side is m DIPs,
+// at scale s, clear or regular, in dark mode or light. A large pane, as a
+// sidebar or an inspector over the content, is a clearer material than a
+// control's, the content under it reading through: it blurs less, up to
+// 5 DIPs, maps black to 35% in light mode and white to 60% in dark mode,
+// lights its rim more, and curves the last 48 DIPs. Panes up to 100 DIPs
+// keep a control's material; it eases into the large one's by 200.
+func paneMaterial(m, s float32, clear, dark bool) material {
+	f := min(max((m-100)/100, 0), 1)
+	f = f * f * (3 - 2*f) // smoothstep
+	lerp := func(a, b float32) float32 { return a + (b-a)*f }
+	bezel := min(lerp(36, 48), m/2)
+	mat := material{
+		bezel:      bezel * s,
+		refraction: 1.6 * bezel * s,
+		rim:        lerp(0.35, 0.5),
+		rimWidth:   1,
+		light:      math.Pi / 2,
+	}
+	switch {
+	case clear:
+		mat.blur = s
+		mat.low, mat.high, mat.curve, mat.saturation = 0.125, 1.082, 1, 1
+	case dark:
+		mat.blur = min(max(m*0.035, 1), lerp(10, 5)) * s
+		mat.low, mat.high, mat.curve, mat.saturation = 0.15, lerp(0.51, 0.6), 2, 2.2
+	default:
+		mat.blur = min(max(m*0.035, 1), lerp(10, 5)) * s
+		mat.low, mat.high, mat.curve, mat.saturation = lerp(0.541, 0.35), 1, 1.2, 1
+	}
+	return mat
 }
