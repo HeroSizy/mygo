@@ -48,6 +48,9 @@ panics where the second key was given, as apps only log it.
 - **What it shows.** `tt.Texts`, `tt.HasText`, `tt.Find` (the box of a
   text), `tt.Focused`, `tt.Cursor`, `tt.Clipboard`, `tt.OpenedURLs` and
   `tt.Announcements`, what the view asked screen readers to read out;
+  `tt.Accessibility`, the elements as assistive technology sees them
+  (role, name, value and states), and `tt.AccessibilityText`, the same
+  as indented text, for checking what a screen reader reads;
   `tt.FailOpenURL` makes the links it opens fail, as those no app opens.
 - **Frames.** `tt.Frame` draws a frame, for what changed outside the view,
   and `tt.Image()` is the last frame, for snapshots; `ui.Render` draws a
