@@ -144,9 +144,19 @@ func (d *DiffState) buildSeparators(c *ui.Context, ct *Theme) {
 			label = l10n.In(c.Locale()).UnmodifiedLines(s.Lines)
 		}
 		sep := ui.Box(c).Key(key).Absolute().Left(0).Right(ed.trackWidth()).Top(float32(top - ed.scrollY)).Height(b.height).
-			Role(ui.RoleGroup).Label(label).Cursor(ui.CursorDefault).KeepFocus().HandleInput(shield)
+			Role(ui.RoleGroup).Label(label).Cursor(ui.CursorDefault).KeepFocus().HandleInput(d.scrollUnder)
 		render(c, sep, s)
 	})
+}
+
+// scrollUnder shields the presses on a separator, as shield, but scrolls
+// the viewer with the wheel over it: the separators are built over both
+// sides, outside the editors, so the scrolling would not reach them.
+func (d *DiffState) scrollUnder(ev ui.InputEvent) bool {
+	if ev.Kind != ui.InputScroll {
+		return false
+	}
+	return d.eds[1].wheel(ev)
 }
 
 // DiffHunkActions are the actions on a change of a diff, as
