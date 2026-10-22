@@ -360,3 +360,36 @@ func TestDiffScrollsUnderAnnotation(t *testing.T) {
 		t.Fatalf("scrolled to %v over the comment, want 40", y)
 	}
 }
+
+// The wheel over a hunk's header, built over the sides rather than in
+// them, scrolls the diff, as it does over the lines.
+func TestDiffScrollsUnderHunkHeader(t *testing.T) {
+	var p strings.Builder
+	p.WriteString("--- a/x\n+++ b/x\n")
+	for h := range 6 {
+		p.WriteString("@@ -" + strconv.Itoa(h*100+1) + ",3 +" + strconv.Itoa(h*100+1) + ",30 @@ type Filters =\n c\n")
+		for i := range 27 {
+			p.WriteString("+added " + strconv.Itoa(i) + "\n")
+		}
+		p.WriteString(" c\n c\n")
+	}
+	files, err := ParsePatch(p.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, layout := range []DiffLayout{DiffUnified, DiffSplit} {
+		d := &DiffState{Layout: layout}
+		d.SetPatch(files[0])
+		tt := ui.NewTester(func(c *ui.Context) { DiffView(c, d).Fill() }, 800, 400)
+		tt.Frame()
+		r, ok := tt.Find("@@ -1,3 +1,30 @@ type Filters =")
+		if !ok {
+			t.Fatalf("no header among %q", tt.Texts())
+		}
+		tt.Scroll(r.X+r.W/2, r.Y+r.H/2, 0, 40)
+		tt.Frame()
+		if y := d.eds[1].scrollY; y != 40 {
+			t.Errorf("layout %v: scrolled to %v over the header, want 40", layout, y)
+		}
+	}
+}
