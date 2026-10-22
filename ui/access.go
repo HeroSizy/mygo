@@ -194,24 +194,35 @@ func leafRole(r platform.AccessRole) bool {
 }
 
 // innerText returns the texts of an element and those inside it, joined
-// by spaces.
+// by spaces. An element inside it with a Label gives its label in place
+// of its texts, as a name from content takes a descendant's aria-label on
+// the web: a row reads "Branch main (checked out)" rather than the "✓
+// main" drawn for it.
 func (e *node) innerText() string {
 	var b strings.Builder
-	var walk func(e *node)
-	walk = func(e *node) {
-		if e.flags&flagInvisible != 0 {
+	add := func(s string) {
+		if s == "" {
 			return
 		}
-		if e.kind == kindText {
-			if e.text != "" {
-				if b.Len() > 0 {
-					b.WriteByte(' ')
-				}
-				b.WriteString(e.text)
-			}
+		if b.Len() > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(s)
+	}
+	var walk func(n *node)
+	walk = func(n *node) {
+		if n.flags&flagInvisible != 0 {
+			return
+		}
+		if n != e && n.label != "" {
+			add(n.label)
+			return
+		}
+		if n.kind == kindText {
+			add(n.text)
 			return // its text holds that of the elements inside it
 		}
-		for ch := e.first; ch != nil; ch = ch.next {
+		for ch := n.first; ch != nil; ch = ch.next {
 			walk(ch)
 		}
 	}

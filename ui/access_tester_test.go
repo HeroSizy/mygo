@@ -45,3 +45,26 @@ func TestTesterAccessibility(t *testing.T) {
 		t.Errorf("text:\n%s", text)
 	}
 }
+
+// A list's row is named by its content, an element inside it with a Label
+// by the label rather than its texts, as the web names from content.
+func TestRowNamedByLabels(t *testing.T) {
+	var ls ListState
+	tt := NewTester(func(c *Context) {
+		List(c, &ls, 1, func(i int) {
+			Row(c).Children(func() {
+				Box(c).Label("Branch main (checked out)").Children(func() { Text(c, "✓ main") })
+				Text(c, "Fix the build")
+			})
+		}).Fill()
+	}, 320, 240)
+	for _, e := range tt.Accessibility() {
+		if e.Role == "list item" {
+			if e.Name != "Branch main (checked out) Fix the build" {
+				t.Errorf("row named %q", e.Name)
+			}
+			return
+		}
+	}
+	t.Errorf("no row in\n%s", tt.AccessibilityText())
+}
