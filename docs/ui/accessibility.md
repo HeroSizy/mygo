@@ -115,3 +115,18 @@ MyGo describes frames only once assistive technology asked, so apps pay
 nothing for it otherwise.
 
 Each component's page says what assistive technology sees of it.
+
+## Testing
+
+A [tester](testing.md)'s `Accessibility` lists the elements as screen
+readers see them, with their roles, names, values and states, and
+`AccessibilityText` prints them indented, so a test can check that every
+control has a name:
+
+```go
+for _, e := range tt.Accessibility() {
+	if e.Pressable && e.Name == "" {
+		t.Errorf("a %s without a name at %v", e.Role, e.Bounds)
+	}
+}
+```
